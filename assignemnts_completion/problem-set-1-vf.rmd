@@ -1,0 +1,217 @@
+# Problem Set 1: Data Visualization in R (Vladyslav Fedorchenko)
+
+```{r, echo=FALSE}
+# Load necessary libraries
+pacman::p_load(
+    tidyverse,
+    ggplot2,
+    dplyr,
+    readr,
+    knitr,
+    janitor,
+    gtsummary,
+    here
+)
+```
+
+# Loading dataset
+
+One of the datasets that are available is **PRAMS** dataset that will be used to complete the task
+
+```{r}
+# Load the dataset
+prams_data <- read_csv(here("data", "real", "prams_2011_selected.csv"))
+
+# Show the first few rows of the dataset
+head(prams_data)
+```
+
+# Data Check
+
+Now we will visually inspect the dataset to understand its structure and content. This will help us identify the main variables and any potential issues with the data.
+
+Run some code to check the structure of the dataset and the number of rows and columns
+
+```{r}
+# Check the structure of the dataset
+str(prams_data)
+```
+
+```{r}
+# Summary of the dataset
+summary(prams_data)
+```
+
+```{r}
+# Use skimr to get a more detailed summary of the dataset
+skimr::skim(prams_data)
+```
+
+# Task 1: Dataset Orientation
+
+Now we need to answer the following questions:
+
+- what one row represents
+- the main variables you will use
+- one limitation or caution about the dataset
+
+## What one row represents
+
+One row represents the percentage of the given variable (depression, anxiety, binge drinking, alcohol use) per location per subgroup.
+
+## The main variables you will use
+
+```{r}
+# Check all the column names in the dataset
+colnames(prams_data)
+```
+
+The main variables that I will use are:
+- "depression_within_3_months_birth"    
+- "anxiety_within_3_months_birth"       
+- "binge_drinking_within_3_months_birth"
+- "alcohol_use_within_3_months_birth"
+
+## One limitation or caution about the dataset
+
+The dataset is in the long format with all the subgroups mixed in one column (subgroup_cat) - to work with it we might need to transform it to the wide format (using subgroup_cat and subroup columnns).
+
+```{r}
+# Check all the categories and subgroups in the dataset
+unique(prams_data$subgroup_cat)
+
+unique(prams_data$subgroup)
+```
+
+Also, even after visual inspection I see that some variables has a lot of NA values. 
+
+```{r}
+# Show the number of NA values in each column
+sapply(prams_data, function(x) sum(is.na(x)))
+```
+
+# Task 2: Counts, Composition, Or Rank
+
+Create one plot that answers a categorical question.
+
+Examples:
+
+- Which race/ethnicity categories make up the largest population share in selected states?
+- How do states rank by total population?
+- Which PRAMS subgroup categories appear most often?
+
+Your plot should use clear labels and a short interpretation.
+
+We will try to answer the question: **"Which PRAMS subgroup categories appear most often?"**
+
+We will **summarize data** here to match the task requirement, so we will count the occurrences of each PRAMS subgroup category and then build a horizontal bar chart to visualize the counts of each subgroup category.
+
+```{r}
+# Count the occurrences of each PRAMS subgroup category - data summarisation
+subgroup_counts <- prams_data %>%
+    group_by(subgroup_cat) %>%
+    summarise(count = n()) %>%
+    arrange(desc(count))
+
+subgroup_counts
+```
+
+```{r}
+# Now can build hbar chart to visualize the counts of each subgroup category
+cat_plot <- ggplot(subgroup_counts, aes(x = count, y = reorder(subgroup_cat, count))) +
+    geom_bar(stat = "identity", fill = "steelblue") +
+    labs(title = "Counts of PRAMS Subgroup Categories",
+        subtitle = "Maternal Age - 18 to 44 is the most popular subgroup category",
+         x = "Count",
+         y = "Subgroup Category") +
+    theme_minimal()
+
+print(cat_plot)
+```
+
+# Task 3: Distribution Or Grouped Summary
+
+Create one plot that examines center, spread, shape, outliers, or grouped differences.
+
+Examples:
+
+-What is the distribution of PRAMS binge drinking estimates across state/subgroup rows?
+-How do PRAMS estimates differ by subgroup category?
+-How do race/ethnicity population shares vary across states?
+
+Your plot should include a written interpretation that mentions what the plotted values represent.
+
+We will answer the question: **"How alcohol use within 3 months birth differs by income level?"**
+
+```{r}
+# Filter only "Income (years 2004 and beyond)"
+income_data <- prams_data %>%
+    filter(subgroup_cat == "Income (years 2004 and beyond)")
+
+# Show total number of rows in the filtered dataset
+nrow(income_data)
+
+# Set factor to show plot in the order of income levels
+income_data$subgroup <- factor(income_data$subgroup, 
+                            levels = c("Less than $10,000", "$10,000 to $24,999", "$25,000 to $49,999", "$50,000 or more"))
+
+# Now build boxplot to visualize the distribution of alcohol use within 3 months birth for each income level
+income_plot <- ggplot(income_data, aes(x = subgroup, y = alcohol_use_within_3_months_birth)) +
+    geom_boxplot(fill = "lightblue") +
+    labs(title = "Alcohol Use Within 3 Months Birth by Income Level",
+            subtitle = "Higher income levels tend to have higher alcohol use within 3 months birth",
+         x = "Income Level",
+         y = "Alcohol Use Within 3 Months Birth (%)") +
+    theme_minimal()
+
+print(income_plot)
+```
+
+# Task 4: Association Or Comparison Across Groups
+
+reate one plot that compares two variables or compares a pattern across groups.
+
+Examples:
+
+- How are PRAMS alcohol use and binge drinking estimates related?
+- How do state population rank and one race/ethnicity population share relate?
+- How does a pattern differ across a small number of selected groups?
+
+Your plot should avoid overclaiming. If the data are pre-aggregated, say so.
+
+We will answer the question: **"How are PRAMS alcohol use and binge drinking estimates related?"** and build scatter plot for that one.
+
+But we probably need to pre-aggregate the data to get the average alcohol use and binge drinking estimates for each subgroup category.
+
+```{r, warning=FALSE}
+# Create scatter plot without an aggregation to check
+scatter_plot <- ggplot(prams_data, aes(x = alcohol_use_within_3_months_birth, y = binge_drinking_within_3_months_birth)) +
+    geom_point(color = "cornflowerblue", alpha = 0.5) +
+    labs(title = "Scatter Plot of Alcohol Use vs Binge Drinking",
+    subtitle = "Binge drinking is associated with higher alcohol use within 3 months birth",
+    caption = "Each point represents a state/subgroup row in the default dataset, so the data is pre-aggregated by default",
+         x = "Alcohol Use Within 3 Months Birth (%)",
+         y = "Binge Drinking Within 3 Months Birth (%)") +
+    theme_minimal()
+
+print(scatter_plot)
+```
+
+# Task 5: Reflection
+Write a short paragraph answering:
+
+- Which visualization was most useful for exploratory analysis?
+- What did it help you notice?
+- What question would you ask next?
+
+## Which visualization was most useful for exploratory analysis?
+
+The most useful visualization for exploratory analysis was the boxplot that examined the distribution of alcohol use within 3 months birth by income level. 
+
+## What did it help you notice?
+
+This plot helped me notice that higher income levels tend to have higher alcohol use within 3 months birth, which is an interesting pattern that I would not have noticed just by looking at the summary statistics.
+
+## What question would you ask next?
+
+I would like to check that other categories are associated with higher alcohol use within 3 months birth as well. For example, I would like to check if there is a similar pattern for education level or age group. Also I would have checked the relationship between alcohol use and binge drinking more deeply, maybe by looking at the correlation coefficient or by building a regression model to see if alcohol use can predict binge drinking, so maybe income level is a confounding variable in that relationship.
